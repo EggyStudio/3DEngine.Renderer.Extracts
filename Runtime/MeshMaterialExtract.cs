@@ -25,7 +25,7 @@ public sealed class MeshMaterialExtract : IExtractSystem
             if (!ecs.TryGet(entity, out Material mat)) continue;
             if (mesh.Positions is null || mesh.Positions.Length == 0) continue;
 
-            // Compute model matrix from Transform (identity if missing)
+            // Identity transform if the entity has no Transform component.
             Transform t = default;
             ecs.TryGet(entity, out t);
 
@@ -33,7 +33,6 @@ public sealed class MeshMaterialExtract : IExtractSystem
                       * Matrix4x4.CreateFromQuaternion(t.Rotation)
                       * Matrix4x4.CreateTranslation(t.Position);
 
-            // Spawn render entity with RenderMeshInstance component
             int renderEntity = renderWorld.Spawn();
             renderWorld.Entities.Add(renderEntity, new RenderMeshInstance
             {

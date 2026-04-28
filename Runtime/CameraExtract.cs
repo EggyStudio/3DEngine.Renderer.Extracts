@@ -38,7 +38,6 @@ public sealed class CameraExtract : IExtractSystem
             // Flip Y for Vulkan NDC (Y points downward), preserving CCW front-face winding.
             proj.M22 = -proj.M22;
 
-            // Spawn render entity with ExtractedView component
             int renderEntity = renderWorld.Spawn();
             renderWorld.Entities.Add(renderEntity, new ExtractedView
             {
