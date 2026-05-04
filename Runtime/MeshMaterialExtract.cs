@@ -20,6 +20,28 @@ public sealed class MeshMaterialExtract : IExtractSystem
     {
         if (!world.TryGetResource<EcsWorld>(out var ecs)) return;
 
+        // Make the main-world Texture asset store and (if available) the live AssetServer
+        // visible to render-thread prepare systems so they can resolve Handle<Texture>
+        // -> CPU bytes -> GPU upload. We forward the references each frame; ownership
+        // stays with the main world.
+        if (world.TryGetResource<Assets<Texture>>(out var texAssets))
+            renderWorld.Set(texAssets);
+
+        // Forward Modified texture events so the render-thread TextureGpuRegistry can
+        // invalidate cached GPU uploads in response to AssetServer hot-reloads.
+        var texEvents = world.ReadAssetEvents<Texture>();
+        if (texEvents.Count > 0)
+        {
+            var pending = renderWorld.TryGet<TextureInvalidations>() ?? new TextureInvalidations();
+            for (int i = 0; i < texEvents.Count; i++)
+            {
+                var e = texEvents[i];
+                if (e.Kind == AssetEventKind.Modified || e.Kind == AssetEventKind.Removed)
+                    pending.Ids.Add(e.Id);
+            }
+            renderWorld.Set(pending);
+        }
+
         foreach (var (entity, mesh) in ecs.Query<Mesh>())
         {
             if (!ecs.TryGet(entity, out Material mat)) continue;
@@ -40,8 +62,27 @@ public sealed class MeshMaterialExtract : IExtractSystem
                 ModelMatrix = model,
                 Albedo = mat.Albedo,
                 MeshData = mesh,
-                VertexCount = mesh.Positions.Length
+                VertexCount = mesh.Positions.Length,
+                BaseColorTexture         = mat.BaseColorTexture,
+                MetallicRoughnessTexture = mat.MetallicRoughnessTexture,
+                NormalTexture            = mat.NormalTexture,
+                EmissiveTexture          = mat.EmissiveTexture,
+                OcclusionTexture         = mat.OcclusionTexture,
             });
         }
     }
 }
+
+/// <summary>
+/// Render-thread bucket of <see cref="AssetId"/>s whose backing <see cref="Texture"/>
+/// was modified or removed since the previous frame. Consumed by <see cref="TexturePrepare"/>
+/// to invalidate cached GPU uploads. Cleared each frame after consumption.
+/// </summary>
+/// <seealso cref="MeshMaterialExtract"/>
+/// <seealso cref="TextureGpuRegistry"/>
+public sealed class TextureInvalidations
+{
+    /// <summary>Asset IDs scheduled for cache eviction this frame.</summary>
+    public List<AssetId> Ids { get; } = new();
+}
+
