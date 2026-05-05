@@ -68,6 +68,7 @@ public sealed class MeshMaterialExtract : IExtractSystem
                 NormalTexture            = mat.NormalTexture,
                 EmissiveTexture          = mat.EmissiveTexture,
                 OcclusionTexture         = mat.OcclusionTexture,
+                Material                 = mat.Handle,
             });
         }
     }
